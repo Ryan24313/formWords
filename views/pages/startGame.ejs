@@ -1,0 +1,39 @@
+<html lang="en">
+
+	<%- include('../partials/head.ejs')%>
+
+		<body>
+			<p id="game-code"><%- gameCode %></p>
+			<h2>Players</h2>
+			<div id="players"></div>
+		</body>
+
+		<script>
+			socket.emit('getPlayers')
+			let playersDiv = document.getElementById('players')
+			socket.on('getPlayers', (players) => {
+				console.log('getPlayers', players);
+
+				playersDiv.innerHTML = ''
+
+				for (let player of Object.values(players)) {
+					let playerDiv = document.createElement('div')
+
+					let playerName = document.createElement('p')
+					playerName.innerText = player.username
+					playerDiv.appendChild(playerName)
+
+					let kickButton = document.createElement('button')
+					kickButton.innerText = 'Kick'
+					kickButton.onclick = () => {
+						console.log('kick', player.id);
+						// socket.emit('kickPlayer', player.id)
+					}
+					playerDiv.appendChild(kickButton)
+
+					playersDiv.appendChild(playerDiv)
+				}
+			})
+		</script>
+
+</html>

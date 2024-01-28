@@ -1,22 +1,23 @@
-// @ts-check
-
 // Imported modules
 const express = require('express')
 const session = require('express-session')
 const sqlite3 = require('sqlite3').verbose()
 const crypto = require('crypto');
 const socketIo = require('socket.io')
+const jwt = require('jsonwebtoken')
 
 // Setup
-let db = new sqlite3.Database('databases/database.db')
+const db = new sqlite3.Database('databases/database.db')
 
-var app = express()
+const config = require('./config.json')
+
+const app = express()
 const http = require('http').createServer(app)
 const io = new socketIo.Server(http)
 
 app.set('view engine', 'ejs')
 
-var sessionMiddleware = session({
+const sessionMiddleware = session({
 	secret: crypto.randomBytes(256).toString('hex'),
 	resave: false,
 	saveUninitialized: false
@@ -29,6 +30,7 @@ io.engine.use(sessionMiddleware)
 app.use(express.urlencoded({ extended: true }))
 
 app.use(express.static(__dirname + '/static'))
+
 
 // Constants
 const PORT = 3000
@@ -62,6 +64,7 @@ const STARTING_LETTERS = {
 	Z: 1
 }
 
+
 // Classes
 class Player {
 	/**
@@ -69,12 +72,10 @@ class Player {
 	 *
 	 * @param {Number} id - The id of the player.
 	 * @param {String} username - The username of the player.
-	 * @param {Boolean} guest - Whether or not the player is a guest.
 	 */
-	constructor(id, username, guest) {
+	constructor(id, username) {
 		this.id = id
 		this.username = username
-		this.guest = guest
 	}
 }
 
@@ -93,9 +94,6 @@ class WordList {
 	}
 }
 
-/**
- * Class representing a Letter.
- */
 class Letter {
 	/**
 	 * @class
@@ -135,6 +133,8 @@ class Game {
 	 * @class
 	 *
 	 * @param {number} id - The id of the game.
+	 * @param {number} owner - The id of the owner of the game.
+	 * @param {string} code - The code of the game.
 	 * @param {Object.<number, Player>} players - An object where keys are player's ids and values are instances of the Player class.
 	 * @param {Array.<Array.<Letter | undefined>>} board - The board of the game.
 	 * @param {number} turnNumber - The current turn number.
@@ -145,6 +145,8 @@ class Game {
 	 */
 	constructor(
 		id,
+		owner,
+		code,
 		players,
 		board,
 		turnNumber,
@@ -154,6 +156,8 @@ class Game {
 		turns
 	) {
 		this.id = id
+		this.owner = owner
+		this.code = code
 		this.players = players
 		this.board = board
 		this.turnNumber = turnNumber
@@ -164,17 +168,29 @@ class Game {
 	}
 }
 
+
 // Variables
 let games = {}
 let players = {}
-let wordList = {}
+let wordLists = {}
+let highestGameId = 0
+let highestWordListId = 0
 
+
+// Functions
 /**
  * Creates a new game board.
  * @returns {Array.<Array.<undefined>>} - The newly created game board.
  */
 function createBoard() {
 	return Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE));
+}
+
+
+// Express Functions
+function isAuthenticated(req, res, next) {
+	if (req.session.user) next()
+	else res.redirect(`/login?redirectURL=${config.thisUrl}`)
 }
 
 /**
@@ -195,8 +211,128 @@ function createLetters() {
 }
 
 // Endpoints
-app.get('/', (req, res) => {
-	res.render('index')
+app.get('/', isAuthenticated, (req, res) => {
+	res.render('pages/index', {
+		title: 'Home',
+		loggedIn: typeof userSockets[req.session.user.id] != 'undefined',
+	})
+})
+
+app.get('/login', async (req, res) => {
+	if (req.query.token) {
+		let tokenData = jwt.decode(req.query.token)
+
+		req.session.user = {
+			id: tokenData.id,
+			username: tokenData.username,
+			game: null
+		}
+
+		res.redirect('/')
+	} else {
+		res.redirect(`${config.formbarUrl}/oauth?redirectURL=${config.thisUrl}/login`)
+	}
+})
+
+app.get('/createGame', isAuthenticated, (req, res) => {
+	res.render('pages/createGame', {
+		title: 'Create Game',
+		wordLists: Object.values(wordLists)
+	})
+})
+
+app.post('/createGame', isAuthenticated, (req, res) => {
+	let { wordList } = req.body
+
+	wordList = parseInt(wordList)
+
+	highestGameId++
+
+	let key = ''
+	for (let i = 0; i < 1; i++) {
+		let keygen = 'abcdefghijklmnopqrstuvwxyz123456789'
+		let letter = keygen[Math.floor(Math.random() * keygen.length)]
+		key += letter
+	}
+
+	games[highestGameId] = new Game(
+		highestGameId,
+		req.session.user.id,
+		key,
+		{},
+		createBoard(),
+		1,
+		wordList,
+		createLetters(),
+		{},
+		[]
+	)
+	games[highestGameId].players[req.session.user.id] = new Player(
+		req.session.user.id,
+		req.session.user.username
+	)
+
+	req.session.user.game = highestGameId
+	console.log(`game-${highestGameId}`);
+	userSockets[req.session.user.id].join(`game-${highestGameId}`)
+
+	res.redirect('startGame')
+})
+
+app.get('/startGame', isAuthenticated, (req, res) => {
+	res.render('pages/startGame', {
+		title: 'Start Game',
+		gameCode: games[req.session.user.game].code,
+		owner: games[req.session.user.game].owner == req.session.user.id,
+	})
+})
+
+app.post('/joinGame', isAuthenticated, (req, res) => {
+	let { gameCode } = req.body
+	gameCode = gameCode.toLowerCase()
+
+	let gameId = false
+
+	for (let game of Object.values(games)) {
+		if (game.code == gameCode) {
+			gameId = game.id
+			break
+		}
+	}
+
+	if (!gameId) {
+		userSockets[req.session.user.id].emit('message', 'There is no open game with that code.')
+		res.redirect('/')
+		return
+	}
+
+	req.session.user.game = gameId
+
+	games[gameId].players[req.session.user.id] = new Player(
+		req.session.user.id,
+		req.session.user.username
+	)
+
+	console.log(games[req.session.user.game].players);
+	io.to(`game-${req.session.user.game}`).emit('getPlayers', games[req.session.user.game].players)
+	console.log(`game-${req.session.user.game}`)
+	userSockets[req.session.user.id].join(`game-${req.session.user.game}`)
+
+	res.redirect('/startGame')
+})
+
+
+// Socket.io
+let userSockets = {}
+
+io.on('connection', (socket) => {
+	socket.on('getPlayers', () => {
+		socket.emit('getPlayers', games[socket.request.session.user.game].players)
+	})
+
+	socket.on('login', () => {
+		userSockets[socket.request.session.user.id] = socket
+	})
 })
 
 http.listen(PORT, async () => {
@@ -205,7 +341,7 @@ http.listen(PORT, async () => {
 			if (err) {
 				reject(err)
 			} else {
-				wordList[1] = new WordList(
+				wordLists[defaultWordList.id] = new WordList(
 					defaultWordList.id,
 					defaultWordList.name,
 					JSON.parse(defaultWordList.words)

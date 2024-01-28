@@ -1,3 +1,4 @@
 node_modules
 
 databases/database.db
+config.json

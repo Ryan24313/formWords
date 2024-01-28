@@ -1,0 +1,26 @@
+<html lang="en">
+
+	<%- include('../partials/head.ejs')%>
+
+		<body>
+			<div id="create-game">
+				<a href="/createGame">Create Game</a>
+			</div>
+			<form id="join-game" action="/joinGame" method="post">
+				<input type="text" name="gameCode">
+				<input type="submit" value="Join Game">
+			</form>
+		</body>
+
+		<script>
+			let joinCodeInput = document.getElementById('join-code')
+			let joinGameButton = document.getElementById('join-game-button')
+		</script>
+
+		<% if (!loggedIn) { %>
+			<script>
+				socket.emit('login')
+			</script>
+			<% } %>
+
+</html>

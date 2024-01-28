@@ -1,0 +1,17 @@
+<html lang="en">
+
+	<%- include('../partials/head.ejs')%>
+
+		<body>
+			<form action="/createGame" method="post">
+				<select id="word-list" name="wordList">
+					<option disabled selected>Select a word list</option>
+					<% for (let wordList of wordLists) { %>
+						<option value="<%- wordList.id %>"><%- wordList.name %></option>
+						<% } %>
+				</select>
+				<input type="submit" value="Create Game">
+			</form>
+		</body>
+
+</html>
