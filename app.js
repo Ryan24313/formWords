@@ -13,19 +13,24 @@ const config = require('./config.json')
 
 const app = express()
 const http = require('http').createServer(app)
-const io = new socketIo.Server(http)
+const io = new socketIo.Server(http, {
+
+})
 
 app.set('view engine', 'ejs')
 
 const sessionMiddleware = session({
 	secret: crypto.randomBytes(256).toString('hex'),
 	resave: false,
-	saveUninitialized: false
+	saveUninitialized: true
 })
 
 app.use(sessionMiddleware)
 
-io.engine.use(sessionMiddleware)
+// io.engine.use(sessionMiddleware)
+io.use((socket, next) => {
+	sessionMiddleware(socket.request, {}, next)
+})
 
 app.use(express.urlencoded({ extended: true }))
 
@@ -62,6 +67,13 @@ const STARTING_LETTERS = {
 	X: 1,
 	Y: 2,
 	Z: 1
+}
+const PAGES = {
+	'/': { gamePage: false },
+	'/login': { gamePage: false },
+	'/createGame': { gamePage: false },
+	'/startGame': { gamePage: true },
+	'/joinGame': { gamePage: false }
 }
 
 
@@ -186,13 +198,6 @@ function createBoard() {
 	return Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE));
 }
 
-
-// Express Functions
-function isAuthenticated(req, res, next) {
-	if (req.session.user) next()
-	else res.redirect(`/login?redirectURL=${config.thisUrl}`)
-}
-
 /**
  * Creates an array of letters based on the STARTING_LETTERS object.
  *
@@ -210,11 +215,35 @@ function createLetters() {
 	return letters
 }
 
+
+// Express Functions
+function isAuthenticated(req, res, next) {
+	if (!req.session.user) {
+		res.redirect(`/login?redirectURL=${config.thisUrl}`)
+		return
+	}
+
+	if (!PAGES[req.url]) {
+		res.render('pages/message', {
+			title: 'Error',
+			message: 'Page is not in the pages list.'
+		})
+		return
+	}
+
+	if (PAGES[req.url].gamePage && !req.session.user.game) {
+		res.redirect('/')
+		return
+	}
+
+	next()
+}
+
+
 // Endpoints
 app.get('/', isAuthenticated, (req, res) => {
 	res.render('pages/index', {
-		title: 'Home',
-		loggedIn: typeof userSockets[req.session.user.id] != 'undefined',
+		title: 'Home'
 	})
 })
 
@@ -227,6 +256,7 @@ app.get('/login', async (req, res) => {
 			username: tokenData.username,
 			game: null
 		}
+		req.session.save()
 
 		res.redirect('/')
 	} else {
@@ -273,8 +303,7 @@ app.post('/createGame', isAuthenticated, (req, res) => {
 	)
 
 	req.session.user.game = highestGameId
-	console.log(`game-${highestGameId}`);
-	userSockets[req.session.user.id].join(`game-${highestGameId}`)
+	req.session.save()
 
 	res.redirect('startGame')
 })
@@ -284,6 +313,7 @@ app.get('/startGame', isAuthenticated, (req, res) => {
 		title: 'Start Game',
 		gameCode: games[req.session.user.game].code,
 		owner: games[req.session.user.game].owner == req.session.user.id,
+		currentUser: JSON.stringify(req.session.user)
 	})
 })
 
@@ -307,16 +337,14 @@ app.post('/joinGame', isAuthenticated, (req, res) => {
 	}
 
 	req.session.user.game = gameId
+	req.session.save()
 
 	games[gameId].players[req.session.user.id] = new Player(
 		req.session.user.id,
 		req.session.user.username
 	)
 
-	console.log(games[req.session.user.game].players);
 	io.to(`game-${req.session.user.game}`).emit('getPlayers', games[req.session.user.game].players)
-	console.log(`game-${req.session.user.game}`)
-	userSockets[req.session.user.id].join(`game-${req.session.user.game}`)
 
 	res.redirect('/startGame')
 })
@@ -326,12 +354,84 @@ app.post('/joinGame', isAuthenticated, (req, res) => {
 let userSockets = {}
 
 io.on('connection', (socket) => {
+	try {
+		let user = socket.request.session.user
+
+		if (user) {
+			if (user.id) userSockets[user.id] = socket
+
+			socket.join(`user-${user.id}`)
+			socket.join(`game-${user.game}`)
+		}
+	} catch (err) {
+		console.error(err)
+	}
+
+
+	// Socket.io functions
+	function kickPlayer(gameId, userId) {
+		let game = games[gameId]
+		let userSocket = userSockets[userId]
+
+		userSocket.leave(`game-${socket.request.session.user.game}`)
+		userSocket.request.session.user.game = null
+		userSocket.request.session.save()
+
+		delete game.players[userId]
+
+		io.to(`user-${userId}`).emit('reload')
+	}
+
 	socket.on('getPlayers', () => {
 		socket.emit('getPlayers', games[socket.request.session.user.game].players)
 	})
 
-	socket.on('login', () => {
-		userSockets[socket.request.session.user.id] = socket
+	socket.on('kickPlayer', (userId) => {
+		let game = games[socket.request.session.user.game]
+
+		if (game.owner != socket.request.session.user.id) {
+			socket.emit('message', 'You cannot kick people from a game you do not own.')
+			return
+		}
+
+		if (userId == socket.request.session.user.id) {
+			socket.emit('message', 'You cannot kick yourself.')
+			return
+		}
+
+		kickPlayer(socket.request.session.user.game, userId)
+
+		io.to(`game-${socket.request.session.user.game}`).emit('getPlayers', games[socket.request.session.user.game].players)
+	})
+
+	socket.on('leaveGame', () => {
+		let gameId = socket.request.session.user.game
+
+		if (games[gameId].owner == socket.request.session.user.id) {
+			socket.emit('message', 'You cannot leave you own game.')
+			return
+		}
+
+		kickPlayer(gameId, socket.request.session.user.id)
+
+		console.log(gameId, games[gameId].players);
+
+		io.to(`game-${gameId}`).emit('getPlayers', games[gameId].players)
+	})
+
+	socket.on('endGame', () => {
+		let gameId = socket.request.session.user.game
+
+		if (games[gameId].owner != socket.request.session.user.id) {
+			socket.emit('message', 'You cannot end a game you do not own.')
+			return
+		}
+
+		for (let player of Object.values(games[gameId].players)) {
+			kickPlayer(gameId, player.id)
+		}
+
+		delete games[gameId]
 	})
 })
 

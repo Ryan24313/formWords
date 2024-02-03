@@ -18,5 +18,9 @@
 		socket.on('message', (message) => {
 			alert(message)
 		})
+
+		socket.on('reload', () => {
+			location.reload()
+		})
 	</script>
 </head>
