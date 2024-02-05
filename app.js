@@ -73,7 +73,8 @@ const PAGES = {
 	'/login': { gamePage: false },
 	'/createGame': { gamePage: false },
 	'/startGame': { gamePage: true },
-	'/joinGame': { gamePage: false }
+	'/joinGame': { gamePage: false },
+	'/game': { gamePage: true },
 }
 
 
@@ -147,6 +148,7 @@ class Game {
 	 * @param {number} id - The id of the game.
 	 * @param {number} owner - The id of the owner of the game.
 	 * @param {string} code - The code of the game.
+	 * @param {boolean} started - Whether the game has started.
 	 * @param {Object.<number, Player>} players - An object where keys are player's ids and values are instances of the Player class.
 	 * @param {Array.<Array.<Letter | undefined>>} board - The board of the game.
 	 * @param {number} turnNumber - The current turn number.
@@ -159,6 +161,7 @@ class Game {
 		id,
 		owner,
 		code,
+		started,
 		players,
 		board,
 		turnNumber,
@@ -170,6 +173,7 @@ class Game {
 		this.id = id
 		this.owner = owner
 		this.code = code
+		this.started = started
 		this.players = players
 		this.board = board
 		this.turnNumber = turnNumber
@@ -231,10 +235,22 @@ function isAuthenticated(req, res, next) {
 		return
 	}
 
-	if (PAGES[req.url].gamePage && !req.session.user.game) {
-		res.redirect('/')
-		return
+	if (req.session.user.game) {
+		let game = games[req.session.user.game]
+
+		if (!PAGES[req.url].gamePage) {
+			if (game.started) res.redirect('/game')
+			else res.redirect('/startGame')
+
+			return
+		}
+	} else {
+		if (PAGES[req.url].gamePage) {
+			res.redirect('/')
+			return
+		}
 	}
+
 
 	next()
 }
@@ -289,6 +305,7 @@ app.post('/createGame', isAuthenticated, (req, res) => {
 		highestGameId,
 		req.session.user.id,
 		key,
+		false,
 		{},
 		createBoard(),
 		1,
@@ -349,6 +366,14 @@ app.post('/joinGame', isAuthenticated, (req, res) => {
 	res.redirect('/startGame')
 })
 
+app.get('/game', isAuthenticated, (req, res) => {
+	res.render('pages/game', {
+		title: 'Game',
+		game: games[req.session.user.game],
+		currentUser: JSON.stringify(req.session.user)
+	})
+})
+
 
 // Socket.io
 let userSockets = {}
@@ -366,7 +391,6 @@ io.on('connection', (socket) => {
 	} catch (err) {
 		console.error(err)
 	}
-
 
 	// Socket.io functions
 	function kickPlayer(gameId, userId) {
@@ -432,6 +456,12 @@ io.on('connection', (socket) => {
 		}
 
 		delete games[gameId]
+	})
+
+	socket.on('startGame', () => {
+		let game = games[socket.request.session.user.game]
+
+
 	})
 })
 

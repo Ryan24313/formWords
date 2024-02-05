@@ -4,6 +4,7 @@
 		<body>
 			<% if (owner) { %>
 				<button onclick="socket.emit('endGame')">End Game</button>
+				<button onclick="socket.emit('startGame')">Start Game</button>
 				<% } else { %>
 					<button onclick="socket.emit('leaveGame')">Leave Game</button>
 					<% } %>
