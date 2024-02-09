@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const socketIo = require('socket.io')
 const jwt = require('jsonwebtoken')
 
+
 // Setup
 const db = new sqlite3.Database('databases/database.db')
 
@@ -13,9 +14,7 @@ const config = require('./config.json')
 
 const app = express()
 const http = require('http').createServer(app)
-const io = new socketIo.Server(http, {
-
-})
+const io = new socketIo.Server(http)
 
 app.set('view engine', 'ejs')
 
@@ -27,7 +26,6 @@ const sessionMiddleware = session({
 
 app.use(sessionMiddleware)
 
-// io.engine.use(sessionMiddleware)
 io.use((socket, next) => {
 	sessionMiddleware(socket.request, {}, next)
 })
@@ -85,10 +83,24 @@ class Player {
 	 *
 	 * @param {Number} id - The id of the player.
 	 * @param {String} username - The username of the player.
+	 * @param {Number} game - The id of the game the player is in.
+	 * @param {Number} score - The players score.
+	 * @property {Array.<Letter>} letters - The players letters.
 	 */
-	constructor(id, username) {
+	constructor(id, username, game) {
 		this.id = id
 		this.username = username
+		this.game = game
+		this.score = 0
+		this.letters = []
+	}
+
+	takeLetter() {
+		let gameLetters = games[this.game].lettersLeft
+
+		let letterIndex = Math.floor(Math.random() * gameLetters.length)
+		this.letters.push(gameLetters[letterIndex])
+		gameLetters.splice(letterIndex, 1)
 	}
 }
 
@@ -139,8 +151,6 @@ class Turn {
 	}
 }
 
-new Turn(0, 1, [], 0)
-
 class Game {
 	/**
 	 * @class
@@ -148,7 +158,7 @@ class Game {
 	 * @param {number} id - The id of the game.
 	 * @param {number} owner - The id of the owner of the game.
 	 * @param {string} code - The code of the game.
-	 * @param {boolean} started - Whether the game has started.
+	 * @param {string} status - The status of the game.
 	 * @param {Object.<number, Player>} players - An object where keys are player's ids and values are instances of the Player class.
 	 * @param {Array.<Array.<Letter | undefined>>} board - The board of the game.
 	 * @param {number} turnNumber - The current turn number.
@@ -161,29 +171,26 @@ class Game {
 		id,
 		owner,
 		code,
-		started,
+		status,
 		players,
 		board,
 		turnNumber,
 		wordList,
 		lettersLeft,
-		scores,
 		turns
 	) {
 		this.id = id
 		this.owner = owner
 		this.code = code
-		this.started = started
+		this.status = status
 		this.players = players
 		this.board = board
 		this.turnNumber = turnNumber
 		this.wordList = wordList
 		this.lettersLeft = lettersLeft
-		this.scores = scores
 		this.turns = turns
 	}
 }
-
 
 // Variables
 let games = {}
@@ -192,14 +199,13 @@ let wordLists = {}
 let highestGameId = 0
 let highestWordListId = 0
 
-
 // Functions
 /**
  * Creates a new game board.
  * @returns {Array.<Array.<undefined>>} - The newly created game board.
  */
 function createBoard() {
-	return Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE));
+	return Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => []));
 }
 
 /**
@@ -219,7 +225,6 @@ function createLetters() {
 	return letters
 }
 
-
 // Express Functions
 function isAuthenticated(req, res, next) {
 	if (!req.session.user) {
@@ -238,12 +243,14 @@ function isAuthenticated(req, res, next) {
 	if (req.session.user.game) {
 		let game = games[req.session.user.game]
 
-		if (!PAGES[req.url].gamePage) {
-			if (game.started) res.redirect('/game')
-			else res.redirect('/startGame')
-
+		if (game.status == 'started' && req.url != '/game') res.redirect('/game')
+		else if (game.status == 'waiting' && req.url != '/startGame') res.redirect('/startGame')
+		else {
+			next()
 			return
 		}
+
+		return
 	} else {
 		if (PAGES[req.url].gamePage) {
 			res.redirect('/')
@@ -251,10 +258,8 @@ function isAuthenticated(req, res, next) {
 		}
 	}
 
-
 	next()
 }
-
 
 // Endpoints
 app.get('/', isAuthenticated, (req, res) => {
@@ -301,23 +306,65 @@ app.post('/createGame', isAuthenticated, (req, res) => {
 		key += letter
 	}
 
+	// games[highestGameId] = new Game(
+	//  highestGameId,
+	//  req.session.user.id,
+	//  key,
+	//  'waiting',
+	//  {},
+	//  createBoard(),
+	//  1,
+	//  wordList,
+	//  createLetters(),
+	//  {},
+	//  []
+	// )
+
+	// testing
 	games[highestGameId] = new Game(
 		highestGameId,
 		req.session.user.id,
 		key,
-		false,
+		'waiting',
 		{},
-		createBoard(),
+		Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => {
+			let cell = []
+			let amount = Math.floor(Math.random() * 6)
+
+			for (let i = 0; i < amount; i++) {
+				cell.push(new Letter(i, 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)], 0))
+			}
+
+			return cell
+		})),
 		1,
 		wordList,
 		createLetters(),
 		{},
 		[]
 	)
+
 	games[highestGameId].players[req.session.user.id] = new Player(
 		req.session.user.id,
-		req.session.user.username
+		req.session.user.username,
+		highestGameId
 	)
+
+	//testing
+	for (let i = Object.keys(games[highestGameId].players).length + 1; i <= 4; i++) {
+		let name = ''
+		for (let j = 0; j < 10; j++) {
+			let keygen = 'abcdefghijklmnopqrstuvwxyz123456789'
+			let letter = keygen[Math.floor(Math.random() * keygen.length)]
+			name += letter
+		}
+
+		games[highestGameId].players[i] = new Player(
+			i,
+			name,
+			highestGameId
+		)
+	}
 
 	req.session.user.game = highestGameId
 	req.session.save()
@@ -358,7 +405,8 @@ app.post('/joinGame', isAuthenticated, (req, res) => {
 
 	games[gameId].players[req.session.user.id] = new Player(
 		req.session.user.id,
-		req.session.user.username
+		req.session.user.username,
+		gameId
 	)
 
 	io.to(`game-${req.session.user.game}`).emit('getPlayers', games[req.session.user.game].players)
@@ -367,13 +415,16 @@ app.post('/joinGame', isAuthenticated, (req, res) => {
 })
 
 app.get('/game', isAuthenticated, (req, res) => {
-	res.render('pages/game', {
-		title: 'Game',
-		game: games[req.session.user.game],
-		currentUser: JSON.stringify(req.session.user)
-	})
+	try {
+		res.render('pages/game', {
+			title: 'Game',
+			game: games[req.session.user.game],
+			currentUser: games[req.session.user.game].players[req.session.user.id]
+		})
+	} catch (err) {
+		console.error(err);
+	}
 })
-
 
 // Socket.io
 let userSockets = {}
@@ -396,6 +447,8 @@ io.on('connection', (socket) => {
 	function kickPlayer(gameId, userId) {
 		let game = games[gameId]
 		let userSocket = userSockets[userId]
+
+		if (!userSocket) return
 
 		userSocket.leave(`game-${socket.request.session.user.game}`)
 		userSocket.request.session.user.game = null
@@ -438,8 +491,6 @@ io.on('connection', (socket) => {
 
 		kickPlayer(gameId, socket.request.session.user.id)
 
-		console.log(gameId, games[gameId].players);
-
 		io.to(`game-${gameId}`).emit('getPlayers', games[gameId].players)
 	})
 
@@ -460,8 +511,15 @@ io.on('connection', (socket) => {
 
 	socket.on('startGame', () => {
 		let game = games[socket.request.session.user.game]
+		game.status = 'started'
 
+		for (let i = 0; i < 7; i++) {
+			for (let player of Object.values(game.players)) {
+				player.takeLetter()
+			}
+		}
 
+		io.to(`game-${game.id}`).emit('reload')
 	})
 })
 

@@ -1,0 +1,81 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Consolas;
+  height: 100%;
+  width: 100%;
+}
+
+p {
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+#game {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	grid-row: auto auto;
+}
+
+#gameInfo {
+	grid-column: 1;
+	grid-row: 1;
+
+	height: 75%;
+
+	display: grid;
+	justify-content:center;
+	align-content: space-around;
+}
+
+#scores {
+	font-size: clamp(1rem, 4vmin, 1.7rem);
+}
+
+#board {
+  gap: 0;
+  border-collapse: collapse;
+	grid-column: 2;
+	grid-row: 1;
+}
+
+.letterPiece {
+  --length: min(calc(9vw), calc(8vh));
+
+  position: relative;
+  border: 1px solid black;
+  height: var(--length);
+  width: var(--length);
+}
+
+.letterPiece * {
+  position: absolute;
+}
+
+.letter {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(1.5rem, 7vmin, 3.5rem);
+  text-transform: uppercase;
+}
+
+.stack {
+  bottom: 0%;
+  right: 5%;
+  font-size: clamp(1rem, 3vmin, 2rem);
+}
+
+#letters {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 1rem;
+	grid-column: 2;
+	grid-row: 2;
+}
