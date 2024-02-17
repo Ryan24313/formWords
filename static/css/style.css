@@ -1,26 +1,30 @@
 * {
-  box-sizing: border-box;
+	box-sizing: border-box;
 }
 
 html,
 body {
-  margin: 0;
-  padding: 0;
-  font-family: Consolas;
-  height: 100%;
-  width: 100%;
+	margin: 0;
+	padding: 0;
+	font-family: Consolas;
+	height: 100%;
+	width: 100%;
 }
 
 p {
-  margin: 0;
-  padding: 0;
-  user-select: none;
+	margin: 0;
+	padding: 0;
+	user-select: none;
 }
 
 #game {
 	display: grid;
 	grid-template-columns: 1fr 1fr 1fr;
-	grid-row: auto auto;
+	grid-template-rows: auto auto;
+
+	padding: clamp(0.5rem, 2vmin, 1.5rem);
+
+	justify-items: center;
 }
 
 #gameInfo {
@@ -28,6 +32,7 @@ p {
 	grid-row: 1;
 
 	height: 75%;
+	margin: 0.25rem;
 
 	display: grid;
 	justify-content:center;
@@ -39,43 +44,80 @@ p {
 }
 
 #board {
-  gap: 0;
-  border-collapse: collapse;
+	gap: 0;
+	border-collapse: collapse;
 	grid-column: 2;
 	grid-row: 1;
 }
 
-.letterPiece {
-  --length: min(calc(9vw), calc(8vh));
-
-  position: relative;
-  border: 1px solid black;
-  height: var(--length);
-  width: var(--length);
+#board, .row {
+	width: fit-content;
+	height: fit-content;
 }
 
-.letterPiece * {
-  position: absolute;
+.row {
+	display: flex;
+}
+
+.letterCell {
+	position: relative;
+	border: 1px solid black;
+	width: clamp(2rem, min(8vh, 9vw), 5rem);
+	aspect-ratio: 1 / 1;
+}
+
+.letterCell * {
+	position: absolute;
 }
 
 .letter {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: clamp(1.5rem, 7vmin, 3.5rem);
-  text-transform: uppercase;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	font-size: clamp(1.5rem, 7vmin, 3.5rem);
+	text-transform: uppercase;
 }
 
 .stack {
-  bottom: 0%;
-  right: 5%;
-  font-size: clamp(1rem, 3vmin, 2rem);
+	bottom: 0%;
+	right: 5%;
+	font-size: clamp(1rem, 3vmin, 2rem);
 }
 
 #letters {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 1rem;
+	display: flex;
+	justify-content: space-around;
+	margin-top: 1.5rem;
 	grid-column: 2;
 	grid-row: 2;
+}
+
+@media(max-width: 1200px) {
+	#game {
+			grid-template-columns: 1fr 1fr;
+			grid-template-rows: auto auto auto;
+		}
+}
+
+@media (max-width: 900px) {
+	#game {
+		grid-template-columns: 1fr;
+		grid-template-rows: auto auto auto;
+	}
+
+	#board, #letters {
+		grid-column: 1;
+	}
+
+	#board {
+		grid-row: 2;
+	}
+
+	#letters {
+		grid-row: 3;
+	}
+
+	#gameInfo {
+		grid-row: 1;
+	}
 }

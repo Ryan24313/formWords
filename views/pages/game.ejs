@@ -1,72 +1,76 @@
 <html lang="en">
 
-<%- include('../partials/head.ejs')%>
+	<%- include('../partials/head.ejs')%>
 
-	<body>
-		<div id="game">
-			<div id="gameInfo">
-				<div id="scores">
-					<h3>Scores</h3>
-					<% for (let player of Object.values(game.players)) { %>
-						<p id="<%- player.id %>"><%- player.username %>: <%- player.score %>
-						</p>
+		<body>
+			<div id="game">
+				<div id="gameInfo">
+					<div id="scores">
+						<h3>Scores</h3>
+						<% for (let player of Object.values(game.players)) { %>
+							<p id="<%- player.id %>"><%- player.username %>: <%- player.score %>
+							</p>
+							<% } %>
+					</div>
+					<% if(game.owner==currentUser.id) { %>
+						<div id="controls">
+							<button onclick="socket.emit('endGame')">End Game</button>
+						</div>
 						<% } %>
 				</div>
-				<% if(game.owner==currentUser.id) { %>
-					<div id="controls">
-						<button onclick="socket.emit('endGame')">End Game</button>
-					</div>
-					<% } %>
-			</div>
-			<table id="board">
-				<tbody>
-					<% for (let row of Object.values(game.board)) { %>
-						<tr class="row">
-							<% for (let letter of row) { %>
-								<td class="letterPiece">
-									<p class="letter">
-										<% if (letter.length> 0) { %>
-											<%- letter[letter.length - 1].letter %>
-												<% } %>
-									</p>
-									<p class="stack">
-										<% if (letter.length> 0) { %>
-											<%- letter.length %>
-												<% } %>
-									</p>
-								</td>
+				<table id="board">
+					<tbody>
+						<% for (let row of Object.values(game.board)) { %>
+							<tr class="row">
+								<% for (let letter of row) { %>
+									<td class="letterCell">
+										<% if (false) { %>
+											<p class="letter">
+												<% if (letter.length> 0) { %>
+													<%- letter[letter.length - 1].letter %>
+														<% } %>
+											</p>
+											<p class="stack">
+												<% if (letter.length> 0) { %>
+													<%- letter.length %>
+														<% } %>
+											</p>
+											<% } %>
+									</td>
+									<% } %>
+							</tr>
+							<% } %>
+					</tbody>
+				</table>
+				<div id="letters">
+					<% for (let letter of currentUser.letters) { %>
+						<div class="letterCell">
+							<% if (false) { %>
+								<p class="letter"> <%- letter %></p>
 								<% } %>
-						</tr>
+						</div>
 						<% } %>
-				</tbody>
-			</table>
-			<div id="letters">
-				<% for (let letter of currentUser.letters) { %>
-					<div class="letterPiece">
-						<p class="letter"> <%- letter %></p>
-					</div>
-					<% } %>
+				</div>
 			</div>
-		</div>
-	</body>
+		</body>
 
-	<script>
-		let game = {}
+		<script>
+			let game = {}
 
-		game = JSON.parse('<%- JSON.stringify(game) %>')
-		console.log(game);
+			game = JSON.parse('<%- JSON.stringify(game) %>')
+			console.log(game);
 
-		//  function load(newGame) {
-		//    let board = newGame.board
+			//  function load(newGame) {
+			//    let board = newGame.board
 
-		//    for (let rowIndex = 1; board.length; rowIndex++) {
-		//      let row = board[rowIndex]
+			//    for (let rowIndex = 1; board.length; rowIndex++) {
+			//      let row = board[rowIndex]
 
-		// for (let letter)
-		//    }
-		//  }
+			// for (let letter)
+			//    }
+			//  }
 
-		//  window.onload = load(game);
-	</script>
+			//  window.onload = load(game);
+		</script>
 
 </html>
