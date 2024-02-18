@@ -35,7 +35,7 @@ p {
 	margin: 0.25rem;
 
 	display: grid;
-	justify-content:center;
+	justify-content: center;
 	align-content: space-around;
 }
 
@@ -44,13 +44,13 @@ p {
 }
 
 #board {
-	gap: 0;
 	border-collapse: collapse;
 	grid-column: 2;
 	grid-row: 1;
 }
 
-#board, .row {
+#board,
+.row {
 	width: fit-content;
 	height: fit-content;
 }
@@ -59,11 +59,31 @@ p {
 	display: flex;
 }
 
+.letterPiece {
+	cursor: pointer;
+	width: clamp(2rem, min(8vh, 9vw), 5rem);
+
+	aspect-ratio: 1 / 1;
+}
+
+.letterPiece .dragging {
+	border: 1px solid black;
+}
+
 .letterCell {
 	position: relative;
 	border: 1px solid black;
 	width: clamp(2rem, min(8vh, 9vw), 5rem);
 	aspect-ratio: 1 / 1;
+}
+
+.row .letterCell:has(.letterPiece) {
+	border: 3px solid green;
+}
+
+.row .letterCell .letterPiece {
+	height: 100%;
+	width: 100%;
 }
 
 .letterCell * {
@@ -94,9 +114,9 @@ p {
 
 @media(max-width: 1200px) {
 	#game {
-			grid-template-columns: 1fr 1fr;
-			grid-template-rows: auto auto auto;
-		}
+		grid-template-columns: 1fr 1fr;
+		grid-template-rows: auto auto auto;
+	}
 }
 
 @media (max-width: 900px) {
@@ -105,7 +125,8 @@ p {
 		grid-template-rows: auto auto auto;
 	}
 
-	#board, #letters {
+	#board,
+	#letters {
 		grid-column: 1;
 	}
 

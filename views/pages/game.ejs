@@ -15,17 +15,19 @@
 					<% if(game.owner==currentUser.id) { %>
 						<div id="controls">
 							<button onclick="socket.emit('endGame')">End Game</button>
+							<button onclick="resetLetters()">Reset Letters</button>
 						</div>
 						<% } %>
 				</div>
 				<table id="board">
 					<tbody>
-						<% for (let row of Object.values(game.board)) { %>
-							<tr class="row">
-								<% for (let letter of row) { %>
-									<td class="letterCell">
+						<% for (let [rowIndex, row] of Object.entries(game.board)) { %>
+							<tr class="row" id="row-<%- rowIndex %>">
+								<% for (let [letterIndex,letter] of Object.entries(row)) { %>
+									<td class="letterCell" id="board-<%- letterIndex %>,<%- rowIndex %>" data-x="<%- letterIndex %>"
+										data-y="<%- rowIndex %>">
 										<% if (false) { %>
-											<p class="letter">
+											<p class="letter" id="board-<%- letterIndex %>,<%- rowIndex %>">
 												<% if (letter.length> 0) { %>
 													<%- letter[letter.length - 1].letter %>
 														<% } %>
@@ -43,11 +45,11 @@
 					</tbody>
 				</table>
 				<div id="letters">
-					<% for (let letter of currentUser.letters) { %>
-						<div class="letterCell">
-							<% if (false) { %>
-								<p class="letter"> <%- letter %></p>
-								<% } %>
+					<% for (let [index, letter] of Object.entries(currentUser.letters)) { %>
+						<div class="letterCell" id="hand-<%- index %>">
+							<div class="letterPiece" id="hand-<%- index %>">
+								<p class="letter"><%- letter %></p>
+							</div>
 						</div>
 						<% } %>
 				</div>
@@ -55,10 +57,47 @@
 		</body>
 
 		<script>
-			let game = {}
+			let game = JSON.parse('<%- JSON.stringify(game) %>')
+			let currentUser = JSON.parse('<%- JSON.stringify(currentUser) %>')
+			// console.log(game);
 
-			game = JSON.parse('<%- JSON.stringify(game) %>')
-			console.log(game);
+			let dragElement = null
+
+			for (let letterCell of document.getElementsByClassName('letterCell')) {
+				letterCell.addEventListener('dragover', (event) => {
+					event.preventDefault()
+				})
+				letterCell.addEventListener('drop', (event) => {
+					event.preventDefault()
+
+					let dropElement = event.currentTarget
+					let currentLetter = dropElement.children[0]
+
+					if (dropElement == dragElement.parentNode) return
+
+					if (currentLetter) {
+						dropElement.removeChild(currentLetter)
+						dragElement.parentNode.appendChild(currentLetter)
+					}
+
+					dragElement.classList.remove('dragging')
+					dragElement.parentNode.removeChild(dragElement)
+					dropElement.appendChild(dragElement)
+
+					dragElement = null
+				})
+			}
+
+			for (let letterPiece of document.getElementsByClassName('letterPiece')) {
+				letterPiece.setAttribute('draggable', true)
+
+				letterPiece.addEventListener('dragstart', (event) => {
+					if (dragElement) return
+
+					dragElement = event.target
+					dragElement.classList.add('dragging')
+				})
+			}
 
 			//  function load(newGame) {
 			//    let board = newGame.board
@@ -69,6 +108,19 @@
 			// for (let letter)
 			//    }
 			//  }
+
+			function resetLetters() {
+				for (let i = 0; i < currentUser.letters.length; i++) {
+					let letterElement = document.querySelector(`.letterPiece#hand-${i}`)
+
+					let parentElement = letterElement.parentNode
+
+					if (parentElement.id == `hand-${i}`) continue
+
+					letterElement.parentNode.removeChild(letterElement)
+					document.querySelector(`.letterCell#hand-${i}`).appendChild(letterElement)
+				}
+			}
 
 			//  window.onload = load(game);
 		</script>
