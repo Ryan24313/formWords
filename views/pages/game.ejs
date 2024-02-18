@@ -34,13 +34,14 @@
 														<%- letter[letter.length - 1].letter %>
 															<% } %>
 												</p>
+											</div>
+											<% } %>
 												<p class="stack">
 													<% if (letter.length> 0) { %>
 														<%- letter.length %>
-															<% } %>
+															<% } else {%>
+																<% } %>
 												</p>
-											</div>
-											<% } %>
 									</td>
 									<% } %>
 							</tr>
@@ -81,21 +82,36 @@
 					let dropElement = event.currentTarget
 					let currentLetter = null
 
-					if (dropElement == dragElement.parentNode) return
+					if (dropElement == dragElement.parentElement) return
 
 					if (
 						dropElement.children.length > 0 &&
-						dropElement.children[dropElement.children.length - 1].classList.contains('placing')
+						dropElement.children[dropElement.children.length - 1].classList.contains('letterPiece') &&
+						(
+							dropElement.id.split('-')[0] != 'board' ||
+							dropElement.children[dropElement.children.length - 1].classList.contains('placing')
+						)
 					) {
 						currentLetter = dropElement.children[dropElement.children.length - 1]
 					}
 
+					console.log(currentLetter);
 					if (currentLetter) {
 						dropElement.removeChild(currentLetter)
-						dragElement.parentNode.appendChild(currentLetter)
+						dragElement.parentElement.appendChild(currentLetter)
 					}
 
-					if (dropElement.parentNode.id == 'letters') {
+					if (dropElement.id.split('-')[0] == 'board') {
+						dropElement.querySelector('.stack').innerText = game.board[dropElement.dataset.y][dropElement.dataset.x].length + 1
+					}
+
+					if (dragElement.parentElement.id.split('-')[0] == 'board') {
+						dragElement.parentElement.querySelector('.stack').innerText = game.board[dragElement.parentElement.dataset.y][dragElement.parentElement.dataset.x].length || ''
+
+						if (currentLetter) dragElement.parentElement.querySelector('.stack').innerText = game.board[dragElement.parentElement.dataset.y][dragElement.parentElement.dataset.x].length + 1 || ''
+					}
+
+					if (dropElement.parentElement.id == 'letters') {
 						currentLetter = document.querySelector(`.letterPiece#${dropElement.id}`)
 
 						let dragIndex = dragElement.id.split('-')[1]
@@ -113,7 +129,7 @@
 					else dragElement.classList.remove('placing')
 
 					if (currentLetter) {
-						if (dragElement.parentNode.id.split('-')[0] == 'board') currentLetter.classList.add('placing')
+						if (dragElement.parentElement.id.split('-')[0] == 'board') currentLetter.classList.add('placing')
 						else currentLetter.classList.remove('placing')
 					}
 
@@ -125,7 +141,7 @@
 					})
 
 					dragElement.classList.remove('dragging')
-					dragElement.parentNode.removeChild(dragElement)
+					dragElement.parentElement.removeChild(dragElement)
 					dropElement.appendChild(dragElement)
 
 					dragElement = null
@@ -157,21 +173,19 @@
 				for (let i = 0; i < currentUser.letters.length; i++) {
 					let letterElement = document.querySelector(`.letterPiece#hand-${i}`)
 
-					let parentElement = letterElement.parentNode
+					let parentElement = letterElement.parentElement
 
 					if (parentElement.id == `hand-${i}`) continue
 
 					letterElement.classList.remove('placing')
 					letterElement.classList.remove('dragging')
 
-					letterElement.parentNode.removeChild(letterElement)
+					letterElement.parentElement.removeChild(letterElement)
 					document.querySelector(`.letterCell#hand-${i}`).appendChild(letterElement)
 				}
 			}
 
 			function doTurn() {
-				console.log(placedLetters);
-
 				socket.emit('turn', placedLetters)
 			}
 
