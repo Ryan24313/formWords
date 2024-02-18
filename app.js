@@ -329,11 +329,11 @@ app.post('/createGame', isAuthenticated, (req, res) => {
 		{},
 		Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => {
 			let cell = []
-			let amount = Math.floor(Math.random() * 6)
 
-			for (let i = 0; i < amount; i++) {
-				cell.push(new Letter(i, 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)], 0))
-			}
+			if (Math.floor(Math.random() * 5) != 0) return cell
+
+			cell.push(new Letter(0, 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)], 0))
+			if (cell[0].letter == 'q') cell[0].letter = 'qu'
 
 			return cell
 		})),
@@ -520,6 +520,37 @@ io.on('connection', (socket) => {
 		}
 
 		io.to(`game-${game.id}`).emit('reload')
+	})
+
+	socket.on('lettersMoved', (letters) => {
+		let currentUser = games[socket.request.session.user.game].players[socket.request.session.user.id]
+
+		currentUser.letters = letters
+	})
+
+	socket.on('turn', (placedLetters) => {
+		let words = []
+		let game = games[socket.request.session.user.game]
+		let currentUser = game.players[socket.request.session.user.id]
+		let board = structuredClone(game.board)
+
+		for (let placedLetter of placedLetters) {
+			board[placedLetter.y][placedLetter.x].push(new Letter(
+				game.turnNumber,
+				placedLetter.letter.toLowerCase(),
+				socket.request.session.user.id
+			))
+		}
+
+		for (let placedLetter of placedLetters) {
+			currentUser.letters.splice(placedLetter.letter.index, 1)
+		}
+
+		for (let i = currentUser.letters.length; currentUser.letters.length < 7; i++) {
+			currentUser.takeLetter()
+		}
+
+		game.board = board
 	})
 })
 

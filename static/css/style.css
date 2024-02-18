@@ -75,15 +75,20 @@ p {
 	border: 1px solid black;
 	width: clamp(2rem, min(8vh, 9vw), 5rem);
 	aspect-ratio: 1 / 1;
-}
-
-.row .letterCell:has(.letterPiece) {
-	border: 3px solid green;
+	padding: 0;
 }
 
 .row .letterCell .letterPiece {
 	height: 100%;
 	width: 100%;
+}
+
+.row .letterCell:has(.letterPiece.placing) .letterPiece:not(.placing) {
+	display: none;
+}
+
+.row .letterCell:has(.letterPiece.placing) {
+	border: 3px solid green;
 }
 
 .letterCell * {
@@ -142,3 +147,10 @@ p {
 		grid-row: 1;
 	}
 }
+
+/* .letterCell[data-x="2"][data-y="0"]:last- {
+	background-color: red;
+} */
+/* .letterCell[data-x="2"][data-y="0"] .letterPiece:last-of-type {
+	background-color: red;
+} */

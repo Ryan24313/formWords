@@ -16,6 +16,7 @@
 						<div id="controls">
 							<button onclick="socket.emit('endGame')">End Game</button>
 							<button onclick="resetLetters()">Reset Letters</button>
+							<button onclick="doTurn()">Do Turn</button>
 						</div>
 						<% } %>
 				</div>
@@ -23,20 +24,22 @@
 					<tbody>
 						<% for (let [rowIndex, row] of Object.entries(game.board)) { %>
 							<tr class="row" id="row-<%- rowIndex %>">
-								<% for (let [letterIndex,letter] of Object.entries(row)) { %>
+								<% for (let [letterIndex, letter] of Object.entries(row)) { %>
 									<td class="letterCell" id="board-<%- letterIndex %>,<%- rowIndex %>" data-x="<%- letterIndex %>"
 										data-y="<%- rowIndex %>">
-										<% if (false) { %>
-											<p class="letter" id="board-<%- letterIndex %>,<%- rowIndex %>">
-												<% if (letter.length> 0) { %>
-													<%- letter[letter.length - 1].letter %>
-														<% } %>
-											</p>
-											<p class="stack">
-												<% if (letter.length> 0) { %>
-													<%- letter.length %>
-														<% } %>
-											</p>
+										<% if (letter.length>0) { %>
+											<div class="letterPiece" id="board-<%- letterIndex %>,<%- rowIndex %>">
+												<p class="letter">
+													<% if (letter.length> 0) { %>
+														<%- letter[letter.length - 1].letter %>
+															<% } %>
+												</p>
+												<p class="stack">
+													<% if (letter.length> 0) { %>
+														<%- letter.length %>
+															<% } %>
+												</p>
+											</div>
 											<% } %>
 									</td>
 									<% } %>
@@ -59,9 +62,14 @@
 		<script>
 			let game = JSON.parse('<%- JSON.stringify(game) %>')
 			let currentUser = JSON.parse('<%- JSON.stringify(currentUser) %>')
-			// console.log(game);
-
 			let dragElement = null
+			let placedLetters = []
+
+			function arrayMove(arr, fromIndex, toIndex) {
+				var element = arr[fromIndex]
+				arr.splice(fromIndex, 1)
+				arr.splice(toIndex, 0, element)
+			}
 
 			for (let letterCell of document.getElementsByClassName('letterCell')) {
 				letterCell.addEventListener('dragover', (event) => {
@@ -71,14 +79,50 @@
 					event.preventDefault()
 
 					let dropElement = event.currentTarget
-					let currentLetter = dropElement.children[0]
+					let currentLetter = null
 
 					if (dropElement == dragElement.parentNode) return
+
+					if (
+						dropElement.children.length > 0 &&
+						dropElement.children[dropElement.children.length - 1].classList.contains('placing')
+					) {
+						currentLetter = dropElement.children[dropElement.children.length - 1]
+					}
 
 					if (currentLetter) {
 						dropElement.removeChild(currentLetter)
 						dragElement.parentNode.appendChild(currentLetter)
 					}
+
+					if (dropElement.parentNode.id == 'letters') {
+						currentLetter = document.querySelector(`.letterPiece#${dropElement.id}`)
+
+						let dragIndex = dragElement.id.split('-')[1]
+						let dropIndex = dropElement.id.split('-')[1]
+
+						arrayMove(currentUser.letters, dragIndex, dropIndex)
+
+						dragElement.id = `hand-${dropIndex}`
+						currentLetter.id = `hand-${dragIndex}`
+
+						socket.emit('lettersMoved', currentUser.letters)
+					}
+
+					if (dropElement.id.split('-')[0] == 'board') dragElement.classList.add('placing')
+					else dragElement.classList.remove('placing')
+
+					if (currentLetter) {
+						if (dragElement.parentNode.id.split('-')[0] == 'board') currentLetter.classList.add('placing')
+						else currentLetter.classList.remove('placing')
+					}
+
+					placedLetters.push({
+						index: Number(dragElement.id.split('-')[1]),
+						letter: dragElement.children[0].innerText,
+						x: Number(dropElement.dataset.x),
+						y: Number(dropElement.dataset.y),
+					})
 
 					dragElement.classList.remove('dragging')
 					dragElement.parentNode.removeChild(dragElement)
@@ -117,12 +161,21 @@
 
 					if (parentElement.id == `hand-${i}`) continue
 
+					letterElement.classList.remove('placing')
+					letterElement.classList.remove('dragging')
+
 					letterElement.parentNode.removeChild(letterElement)
 					document.querySelector(`.letterCell#hand-${i}`).appendChild(letterElement)
 				}
 			}
 
-			//  window.onload = load(game);
+			function doTurn() {
+				console.log(placedLetters);
+
+				socket.emit('turn', placedLetters)
+			}
+
+			//  window.onload = load(game)
 		</script>
 
 </html>
